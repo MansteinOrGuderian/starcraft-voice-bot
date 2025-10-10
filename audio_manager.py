@@ -10,7 +10,7 @@ class AudioManager:
         self._load_audio_files()
     
     def _load_audio_files(self) -> None:
-        """Load all .wav files from the audio directory and subdirectories"""
+        """Load all audio files (.ogg) from the audio directory and subdirectories"""
         if not os.path.exists(self.audio_dir):
             os.makedirs(self.audio_dir)
             return
@@ -18,7 +18,7 @@ class AudioManager:
         # Walk through all subdirectories
         for root, _, files in os.walk(self.audio_dir):
             for file in files:
-                if file.endswith('.wav'):
+                if file.endswith(('.wav', '.ogg')):  # Support both formats
                     # Get full path
                     full_path = os.path.join(root, file)
                     
@@ -32,11 +32,13 @@ class AudioManager:
                     if len(path_parts) > 1:
                         # Has subdirectories
                         category = '/'.join(path_parts[:-1])
-                        filename = path_parts[-1][:-4]  # Remove .wav
+                        filename = path_parts[-1]
+                        # Remove extension (.ogg)
+                        filename = filename.rsplit('.', 1)[0]
                         display_name = f"[{category.title()}] {filename}"
                     else:
                         # File in root audio_files directory
-                        display_name = file[:-4]
+                        display_name = file.rsplit('.', 1)[0]
                     
                     self.audio_files[relative_path] = display_name
     

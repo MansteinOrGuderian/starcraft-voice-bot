@@ -2,7 +2,7 @@ import asyncio
 import logging
 import json
 import os
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher
 from aiogram.types import (
     InlineQuery, InlineQueryResultCachedVoice,
     Message, FSInputFile
@@ -113,8 +113,8 @@ async def cmd_upload(message: Message):
                 # Delete the message to keep chat clean
                 await sent_message.delete()
                 
-                # Add delay to avoid rate limits (0.5 seconds between uploads)
-                await asyncio.sleep(0.5)
+                # Increased delay to avoid rate limits (1 second between uploads)
+                await asyncio.sleep(1.0)
                 
                 # Save cache periodically
                 if uploaded % 10 == 0:
@@ -123,7 +123,11 @@ async def cmd_upload(message: Message):
                         f"✅ Progress: {uploaded + skipped}/{total_files}\n"
                         f"Uploaded: {uploaded} | Skipped: {skipped} | Errors: {errors}"
                     )
-                    await message.answer(progress_msg)
+                    try:
+                        await message.answer(progress_msg)
+                    except TelegramRetryAfter:
+                        # If we can't send progress, just continue
+                        logger.warning("Can't send progress message due to rate limit")
                 
                 break  # Success, exit retry loop
                 
@@ -131,10 +135,18 @@ async def cmd_upload(message: Message):
                 # Rate limit hit, wait and retry
                 retry_after = e.retry_after
                 logger.warning(f"Rate limit hit. Waiting {retry_after} seconds...")
-                await message.answer(
-                    f"⏸️ Rate limit reached. Pausing for {retry_after} seconds..."
-                )
-                await asyncio.sleep(retry_after + 1)
+                
+                # Try to notify user, but don't fail if this also hits rate limit
+                try:
+                    await message.answer(
+                        f"⏸️ Rate limit reached. Pausing for {retry_after} seconds..."
+                    )
+                except TelegramRetryAfter:
+                    # Can't send message, just log it
+                    logger.warning("Can't send pause notification due to rate limit")
+                
+                # Wait the required time plus buffer
+                await asyncio.sleep(retry_after + 2)
                 retry_count += 1
                 
             except Exception as e:
@@ -149,13 +161,25 @@ async def cmd_upload(message: Message):
     # Save final cache
     save_file_id_cache(file_id_cache)
     
-    await message.answer(
-        f"✅ Upload completed!\n"
-        f"Total: {total_files}\n"
-        f"Uploaded: {uploaded}\n"
-        f"Skipped: {skipped}\n"
-        f"Errors: {errors}"
-    )
+    try:
+        await message.answer(
+            f"✅ Upload completed!\n"
+            f"Total: {total_files}\n"
+            f"Uploaded: {uploaded}\n"
+            f"Skipped: {skipped}\n"
+            f"Errors: {errors}"
+        )
+    except TelegramRetryAfter as e:
+        # If final message fails, just log completion
+        logger.info(f"Upload completed: {uploaded} uploaded, {skipped} skipped, {errors} errors")
+        await asyncio.sleep(e.retry_after)
+        await message.answer(
+            f"✅ Upload completed!\n"
+            f"Total: {total_files}\n"
+            f"Uploaded: {uploaded}\n"
+            f"Skipped: {skipped}\n"
+            f"Errors: {errors}"
+        )
 
 
 @dp.inline_query()
@@ -213,8 +237,16 @@ async def main():
     logger.info(f"Loaded {len(audio_manager.audio_files)} audio files")
     logger.info(f"Cached {len(file_id_cache)} file IDs")
     
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    finally:
+        await bot.session.close()
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n✅ Bot stopped gracefully")
