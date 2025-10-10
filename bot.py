@@ -247,8 +247,20 @@ async def main():
             len(file_id_cache)
         ))
     
+    async def debug_files(request):
+        # Show first 10 files for debugging
+        files_list = list(audio_manager.audio_files.items())[:10]
+        debug_info = "First 10 files:\n"
+        for path, name in files_list:
+            full_path = audio_manager.get_file_path(path)
+            exists = os.path.exists(full_path)
+            size = os.path.getsize(full_path) if exists else 0
+            debug_info += f"\n{name}\n  Path: {path}\n  Exists: {exists}\n  Size: {size} bytes\n"
+        return web.Response(text=debug_info)
+    
     app.router.add_get("/", health_check)
     app.router.add_get("/health", health_check)
+    app.router.add_get("/debug", debug_files)
     
     # Get port from environment (Render sets this)
     port = int(os.getenv('PORT', 10000))
