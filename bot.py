@@ -2,6 +2,7 @@ import asyncio
 import logging
 import json
 import os
+from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.types import (
     InlineQuery, InlineQueryResultCachedVoice,
@@ -237,12 +238,28 @@ async def main():
     logger.info(f"Loaded {len(audio_manager.audio_files)} audio files")
     logger.info(f"Cached {len(file_id_cache)} file IDs")
     
+    # Create simple web server for health checks (keeps Render alive)
+    app = web.Application()
+    
+    async def health_check(request):
+        return web.Response(text="Bot is running!")
+    
+    app.router.add_get("/", health_check)
+    
+    # Start web server
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', int(os.getenv('PORT', 8080)))
+    await site.start()
+    logger.info("Health check server started on port 8080")
+    
     try:
         await dp.start_polling(bot)
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     finally:
         await bot.session.close()
+        await runner.cleanup()
 
 
 if __name__ == '__main__':
