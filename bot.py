@@ -242,16 +242,23 @@ async def main():
     app = web.Application()
     
     async def health_check(request):
-        return web.Response(text="Bot is running!")
+        return web.Response(text="Bot is running! Audio files: {}, Cached: {}".format(
+            len(audio_manager.audio_files), 
+            len(file_id_cache)
+        ))
     
     app.router.add_get("/", health_check)
+    app.router.add_get("/health", health_check)
+    
+    # Get port from environment (Render sets this)
+    port = int(os.getenv('PORT', 10000))
     
     # Start web server
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', int(os.getenv('PORT', 8080)))
+    site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    logger.info("Health check server started on port 8080")
+    logger.info(f"Health check server started on port {port}")
     
     try:
         await dp.start_polling(bot)
