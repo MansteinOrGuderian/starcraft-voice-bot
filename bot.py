@@ -27,17 +27,31 @@ FILE_ID_CACHE_PATH = 'file_id_cache.json'
 
 
 def load_file_id_cache():
-    """Load file_id cache from JSON file"""
+    """Load file_id cache from JSON file and normalize paths"""
     if os.path.exists(FILE_ID_CACHE_PATH):
         with open(FILE_ID_CACHE_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            cache = json.load(f)
+        
+        # Normalize paths: convert all to forward slashes for cross-platform compatibility
+        normalized_cache = {}
+        for path, file_id in cache.items():
+            normalized_path = path.replace('\\', '/')
+            normalized_cache[normalized_path] = file_id
+        
+        return normalized_cache
     return {}
 
 
 def save_file_id_cache(cache):
-    """Save file_id cache to JSON file"""
+    """Save file_id cache to JSON file with normalized paths"""
+    # Normalize paths before saving
+    normalized_cache = {}
+    for path, file_id in cache.items():
+        normalized_path = path.replace('\\', '/')
+        normalized_cache[normalized_path] = file_id
+    
     with open(FILE_ID_CACHE_PATH, 'w', encoding='utf-8') as f:
-        json.dump(cache, f, ensure_ascii=False, indent=2)
+        json.dump(normalized_cache, f, ensure_ascii=False, indent=2)
 
 
 file_id_cache = load_file_id_cache()

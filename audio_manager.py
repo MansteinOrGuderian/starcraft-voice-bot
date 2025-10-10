@@ -10,7 +10,7 @@ class AudioManager:
         self._load_audio_files()
     
     def _load_audio_files(self) -> None:
-        """Load all audio files (.ogg) from the audio directory and subdirectories"""
+        """Load all audio files (.wav, .ogg) from the audio directory and subdirectories"""
         if not os.path.exists(self.audio_dir):
             os.makedirs(self.audio_dir)
             return
@@ -25,15 +25,18 @@ class AudioManager:
                     # Get relative path from audio_dir
                     relative_path = os.path.relpath(full_path, self.audio_dir)
                     
+                    # Normalize path separators to forward slashes for cross-platform compatibility
+                    relative_path = relative_path.replace('\\', '/')
+                    
                     # Create display name with category
-                    # Example: protoss/zealot/attack.wav -> [Protoss/Zealot] attack
-                    path_parts = relative_path.replace('\\', '/').split('/')
+                    # Example: protoss/zealot/attack.ogg -> [Protoss/Zealot] attack
+                    path_parts = relative_path.split('/')  # Already normalized to forward slashes
                     
                     if len(path_parts) > 1:
                         # Has subdirectories
                         category = '/'.join(path_parts[:-1])
                         filename = path_parts[-1]
-                        # Remove extension (.ogg)
+                        # Remove extension (.wav or .ogg)
                         filename = filename.rsplit('.', 1)[0]
                         display_name = f"[{category.title()}] {filename}"
                     else:
@@ -75,8 +78,10 @@ class AudioManager:
         return matched_results
     
     def get_file_path(self, relative_path: str) -> str:
-        """Get full path to audio file from relative path"""
-        return os.path.join(self.audio_dir, relative_path)
+        """Get full path to audio file from relative path (cross-platform safe)"""
+        # Convert forward slashes to OS-specific separator
+        relative_path_os = relative_path.replace('/', os.sep)
+        return os.path.join(self.audio_dir, relative_path_os)
     
     def get_all_files(self) -> Dict[str, str]:
         """Get all audio files as {relative_path: display_name}"""
