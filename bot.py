@@ -187,11 +187,16 @@ async def cmd_upload(message: Message):
 async def inline_query_handler(inline_query: InlineQuery):
     query = inline_query.query.strip()
     
+    logger.info(f"Inline query received: '{query}' from user {inline_query.from_user.id}")
+    
     # Search for matching audio files
     results = audio_manager.search(query, limit=50)
     
+    logger.info(f"Found {len(results)} search results")
+    
     if not results:
         # Show "no results" message
+        logger.warning(f"No results found for query: '{query}'")
         await inline_query.answer(
             results=[],
             cache_time=1,
@@ -205,6 +210,7 @@ async def inline_query_handler(inline_query: InlineQuery):
     for idx, (relative_path, display_name, _) in enumerate(results):
         # Only show files that have been uploaded to Telegram
         if relative_path not in file_id_cache:
+            logger.warning(f"File not in cache: {relative_path}")
             continue
         
         result = InlineQueryResultCachedVoice(
@@ -215,7 +221,10 @@ async def inline_query_handler(inline_query: InlineQuery):
         
         inline_results.append(result)
     
+    logger.info(f"Sending {len(inline_results)} inline results")
+    
     if not inline_results:
+        logger.warning("No cached files found for results")
         await inline_query.answer(
             results=[],
             cache_time=1,
