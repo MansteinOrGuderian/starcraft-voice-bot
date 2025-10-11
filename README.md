@@ -35,7 +35,6 @@ Try these searches in any chat:
 ## 📋 Bot Commands
 
 - `/start` - Show welcome message
-- `/stats` - See statistics (how many sounds available)
 
 ## ❓ FAQ
 
