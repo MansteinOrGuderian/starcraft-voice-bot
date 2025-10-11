@@ -11,7 +11,7 @@ from aiogram.types import (
 )
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramRetryAfter
-from config import BOT_TOKEN, AUDIO_DIR
+from config import BOT_TOKEN, AUDIO_DIR, ADMIN_USER_ID
 from audio_manager import AudioManager
 
 # Configure logging
@@ -58,6 +58,11 @@ def save_file_id_cache(cache):
 file_id_cache = load_file_id_cache()
 
 
+def is_admin(user_id: int) -> bool:
+    """Check if user is admin"""
+    return user_id == ADMIN_USER_ID
+
+
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
     bot_username = (await bot.get_me()).username
@@ -72,9 +77,7 @@ async def cmd_start(message: Message):
         "/protoss - Browse Protoss sounds\n"
         "/terran - Browse Terran sounds\n"
         "/zerg - Browse Zerg sounds\n"
-        "/music - Browse music tracks\n"
-        "/upload - Upload all audio files to Telegram\n"
-        "/stats - Show statistics".format(bot_username, bot_username)
+        "/music - Browse music tracks".format(bot_username, bot_username)
     )
 
 
@@ -103,10 +106,15 @@ async def send_category_sounds(message: Message, category: str, title: str):
     # Get all files from category
     category_files = [
         (path, name) for path, name in audio_manager.get_all_files().items()
-        if path.startswith(category + '/')
+        if path.startswith(category + '/') or path.startswith(category + '\\')
     ]
     
+    logger.info(f"Category '{category}': found {len(category_files)} files")
+    
     if not category_files:
+        # Debug: show what paths we have
+        all_paths = list(audio_manager.get_all_files().keys())[:5]
+        logger.warning(f"No files found for category '{category}'. Sample paths: {all_paths}")
         await message.answer(f"No sounds found in {category} category.")
         return
     
@@ -121,7 +129,7 @@ async def send_category_sounds(message: Message, category: str, title: str):
         response += f"{idx}. {name}\n"
     
     bot_username = (await bot.get_me()).username
-    response += f"\n💡 To send any sound, use inline mode:\n"
+    response += "\n💡 To send any sound, use inline mode:\n"
     response += f"@{bot_username} {category}\n\n"
     response += f"🔄 Send /{category} again for different samples!"
     
@@ -138,20 +146,28 @@ async def send_category_sounds(message: Message, category: str, title: str):
 
 @dp.message(Command("stats"))
 async def cmd_stats(message: Message):
+    # Admin only
+    if not is_admin(message.from_user.id):
+        return
+    
     total_files = len(audio_manager.audio_files)
     cached_files = len(file_id_cache)
     
     # Get stats by category
     category_stats = audio_manager.get_stats_by_category()
     
-    stats_text = "📊 Statistics:\n\n"
-    stats_text += f"Total audio files: {total_files}\n"
-    stats_text += f"Uploaded to Telegram: {cached_files}\n\n"
+    stats_text = "📊 Statistics\n\n"
+    stats_text += f"Total: {total_files} files\n"
+    stats_text += f"Cached: {cached_files} files\n\n"
     stats_text += "By category:\n"
     
     for category, count in sorted(category_stats.items()):
         cached_in_cat = sum(1 for path in file_id_cache.keys() if path.startswith(category))
-        stats_text += f"  • {category.title()}: {count} (uploaded: {cached_in_cat})\n"
+        stats_text += f"• {category.title()}: {count} ({cached_in_cat} cached)\n"
+    
+    # Safety check for message length (Telegram limit is 4096)
+    if len(stats_text) > 4000:
+        stats_text = stats_text[:3900] + "\n\n... (truncated)"
     
     await message.answer(stats_text)
 
@@ -159,6 +175,10 @@ async def cmd_stats(message: Message):
 @dp.message(Command("upload"))
 async def cmd_upload(message: Message):
     """Upload all audio files to Telegram and cache their file_ids"""
+    # Admin only
+    if not is_admin(message.from_user.id):
+        return
+    
     await message.answer("⏳ Starting audio file upload...")
     
     uploaded = 0
