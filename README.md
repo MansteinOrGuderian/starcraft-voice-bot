@@ -22,7 +22,7 @@ You can use the bot in **any** Telegram chat (private messages, groups, or chann
 Try these searches in any chat:
 
 - `@SC_ukr_sounds_bot zealot` - Zealot unit sounds
-- `@SC_ukr_sounds_bot протос` - All Protoss sounds
+- `@SC_ukr_sounds_bot протос` - All protoss sounds
 - `@SC_ukr_sounds_bot marine` - Marine unit sounds
 - `@SC_ukr_sounds_bot music` - Find all music sounds
 - `@SC_ukr_sounds_bot раком` - Find one of specific sound
@@ -34,7 +34,11 @@ Try these searches in any chat:
 
 ## 📋 Bot Commands
 
-- `/start` - Show welcome message
+- `/start` - Show welcome message and instructions
+- `/protoss` - Browse Protoss sounds (random 10 samples)
+- `/terran` - Browse Terran sounds (random 10 samples)
+- `/zerg` - Browse Zerg sounds (random 10 samples)
+- `/music` - Browse music tracks (random 10 samples)
 
 ## ❓ FAQ
 
