@@ -55,7 +55,6 @@ class AudioManager:
         
         # Search in display names
         display_names = list(self.audio_files.values())
-        relative_paths = list(self.audio_files.keys())
         
         # Use fuzzy matching with partial ratio for better results
         results = process.extract(
