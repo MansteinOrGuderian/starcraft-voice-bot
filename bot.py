@@ -7,7 +7,7 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.types import (
     InlineQuery, InlineQueryResultCachedVoice,
-    Message, FSInputFile
+    Message, FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 )
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramRetryAfter
@@ -99,7 +99,7 @@ async def cmd_music(message: Message):
 
 
 async def send_category_sounds(message: Message, category: str, title: str):
-    """Send sample sounds from a specific category"""
+    """Show sample sounds from a specific category as a list"""
     # Get all files from category
     category_files = [
         (path, name) for path, name in audio_manager.get_all_files().items()
@@ -115,29 +115,25 @@ async def send_category_sounds(message: Message, category: str, title: str):
     samples = random.sample(category_files, sample_size)
     
     response = f"{title}\n\n"
-    response += f"Showing {sample_size} random sounds of {len(category_files)} total:\n\n"
+    response += f"🎲 Random selection ({sample_size} of {len(category_files)} total):\n\n"
     
-    for path, name in samples:
-        # Send actual voice message if cached
-        if path in file_id_cache:
-            try:
-                await message.answer_voice(
-                    voice=file_id_cache[path],
-                    caption=name
-                )
-                await asyncio.sleep(0.3)  # Small delay between messages
-            except Exception as e:
-                logger.error(f"Error sending voice {path}: {e}")
-        else:
-            response += f"• {name}\n"
+    for idx, (path, name) in enumerate(samples, 1):
+        response += f"{idx}. {name}\n"
     
-    if sample_size < len(category_files):
-        bot_username = (await bot.get_me()).username
-        response += "\n💡 Use inline mode to search all sounds:\n"
-        response += f"@{bot_username} {category}\n\n"
-        response += f"🔄 Send /{category} again for different random samples!"
+    bot_username = (await bot.get_me()).username
+    response += f"\n💡 To send any sound, use inline mode:\n"
+    response += f"@{bot_username} {category}\n\n"
+    response += f"🔄 Send /{category} again for different samples!"
     
-    await message.answer(response)
+    # Create inline keyboard with "Try Inline Mode" button
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=f"🔍 Search {category.title()} sounds",
+            switch_inline_query_current_chat=category
+        )]
+    ])
+    
+    await message.answer(response, reply_markup=keyboard)
 
 
 @dp.message(Command("stats"))
