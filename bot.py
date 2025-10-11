@@ -2,6 +2,7 @@ import asyncio
 import logging
 import json
 import os
+import random
 from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.types import (
@@ -68,9 +69,75 @@ async def cmd_start(message: Message):
         "3. Choose the audio from the list\n\n"
         "Example: @{} zealot\n\n"
         "Commands:\n"
+        "/protoss - Browse Protoss sounds\n"
+        "/terran - Browse Terran sounds\n"
+        "/zerg - Browse Zerg sounds\n"
+        "/music - Browse music tracks\n"
         "/upload - Upload all audio files to Telegram\n"
         "/stats - Show statistics".format(bot_username, bot_username)
     )
+
+
+@dp.message(Command("protoss"))
+async def cmd_protoss(message: Message):
+    await send_category_sounds(message, "protoss", "⚡ Protoss Sounds")
+
+
+@dp.message(Command("terran"))
+async def cmd_terran(message: Message):
+    await send_category_sounds(message, "terran", "🔧 Terran Sounds")
+
+
+@dp.message(Command("zerg"))
+async def cmd_zerg(message: Message):
+    await send_category_sounds(message, "zerg", "👾 Zerg Sounds")
+
+
+@dp.message(Command("music"))
+async def cmd_music(message: Message):
+    await send_category_sounds(message, "music", "🎵 Music Tracks")
+
+
+async def send_category_sounds(message: Message, category: str, title: str):
+    """Send sample sounds from a specific category"""
+    # Get all files from category
+    category_files = [
+        (path, name) for path, name in audio_manager.get_all_files().items()
+        if path.startswith(category + '/')
+    ]
+    
+    if not category_files:
+        await message.answer(f"No sounds found in {category} category.")
+        return
+    
+    # Show 10 random files
+    sample_size = min(10, len(category_files))
+    samples = random.sample(category_files, sample_size)
+    
+    response = f"{title}\n\n"
+    response += f"Showing {sample_size} random sounds of {len(category_files)} total:\n\n"
+    
+    for path, name in samples:
+        # Send actual voice message if cached
+        if path in file_id_cache:
+            try:
+                await message.answer_voice(
+                    voice=file_id_cache[path],
+                    caption=name
+                )
+                await asyncio.sleep(0.3)  # Small delay between messages
+            except Exception as e:
+                logger.error(f"Error sending voice {path}: {e}")
+        else:
+            response += f"• {name}\n"
+    
+    if sample_size < len(category_files):
+        bot_username = (await bot.get_me()).username
+        response += "\n💡 Use inline mode to search all sounds:\n"
+        response += f"@{bot_username} {category}\n\n"
+        response += f"🔄 Send /{category} again for different random samples!"
+    
+    await message.answer(response)
 
 
 @dp.message(Command("stats"))
