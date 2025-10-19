@@ -380,9 +380,13 @@ async def main():
     
     try:
         await dp.start_polling(bot)
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot stopped by signal")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise
     finally:
+        logger.info("Cleaning up...")
         await bot.session.close()
         await runner.cleanup()
 
@@ -392,3 +396,6 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n✅ Bot stopped gracefully")
+    except Exception as e:
+        print(f"\n❌ Bot crashed: {e}")
+        exit(1)
