@@ -379,23 +379,33 @@ async def main():
     logger.info(f"Health check server started on port {port}")
     
     try:
+        # Start polling - this blocks until stopped
         await dp.start_polling(bot)
     except (KeyboardInterrupt, SystemExit):
         logger.info("Bot stopped by signal")
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        raise
+        logger.error(f"Unexpected error in polling: {e}", exc_info=True)
     finally:
         logger.info("Cleaning up...")
-        await bot.session.close()
-        await runner.cleanup()
+        try:
+            await bot.session.close()
+            await runner.cleanup()
+            logger.info("Cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
+        
+        # Force exit to ensure Render knows we're done
+        logger.info("Exiting process")
 
 
 if __name__ == '__main__':
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n✅ Bot stopped gracefully")
+        logger.info("Bot stopped by keyboard interrupt")
     except Exception as e:
-        print(f"\n❌ Bot crashed: {e}")
-        exit(1)
+        logger.error(f"Fatal error: {e}", exc_info=True)
+    finally:
+        # Ensure process exits
+        logger.info("Process terminating")
+        exit(0)
