@@ -337,65 +337,81 @@ async def inline_query_handler(inline_query: InlineQuery):
 
 
 async def main():
-    logger.info("Starting bot...")
+    """Main bot function with auto-restart on failure"""
+    max_restarts = 5
+    restart_count = 0
     
-    # Load audio files
-    audio_manager._load_audio_files()
-    logger.info(f"Loaded {len(audio_manager.audio_files)} audio files")
-    logger.info(f"Cached {len(file_id_cache)} file IDs")
-    
-    # Create simple web server for health checks (keeps Render alive)
-    app = web.Application()
-    
-    async def health_check(request):
-        return web.Response(text="Bot is running! Audio files: {}, Cached: {}".format(
-            len(audio_manager.audio_files), 
-            len(file_id_cache)
-        ))
-    
-    async def debug_files(request):
-        # Show first 10 files for debugging
-        files_list = list(audio_manager.audio_files.items())[:10]
-        debug_info = "First 10 files:\n"
-        for path, name in files_list:
-            full_path = audio_manager.get_file_path(path)
-            exists = os.path.exists(full_path)
-            size = os.path.getsize(full_path) if exists else 0
-            debug_info += f"\n{name}\n  Path: {path}\n  Exists: {exists}\n  Size: {size} bytes\n"
-        return web.Response(text=debug_info)
-    
-    app.router.add_get("/", health_check)
-    app.router.add_get("/health", health_check)
-    app.router.add_get("/debug", debug_files)
-    
-    # Get port from environment (Render sets this)
-    port = int(os.getenv('PORT', 10000))
-    
-    # Start web server
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
-    logger.info(f"Health check server started on port {port}")
-    
-    try:
-        # Start polling - this blocks until stopped
-        await dp.start_polling(bot)
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Bot stopped by signal")
-    except Exception as e:
-        logger.error(f"Unexpected error in polling: {e}", exc_info=True)
-    finally:
-        logger.info("Cleaning up...")
+    while restart_count < max_restarts:
         try:
-            await bot.session.close()
-            await runner.cleanup()
-            logger.info("Cleanup completed")
-        except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
+            logger.info(f"Starting bot... (attempt {restart_count + 1}/{max_restarts})")
+            
+            # Load audio files
+            audio_manager._load_audio_files()
+            logger.info(f"Loaded {len(audio_manager.audio_files)} audio files")
+            logger.info(f"Cached {len(file_id_cache)} file IDs")
+            
+            # Create simple web server for health checks (keeps Render alive)
+            app = web.Application()
+            
+            async def health_check(request):
+                return web.Response(text="Bot is running! Audio files: {}, Cached: {}".format(
+                    len(audio_manager.audio_files), 
+                    len(file_id_cache)
+                ))
+            
+            async def debug_files(request):
+                # Show first 10 files for debugging
+                files_list = list(audio_manager.audio_files.items())[:10]
+                debug_info = "First 10 files:\n"
+                for path, name in files_list:
+                    full_path = audio_manager.get_file_path(path)
+                    exists = os.path.exists(full_path)
+                    size = os.path.getsize(full_path) if exists else 0
+                    debug_info += f"\n{name}\n  Path: {path}\n  Exists: {exists}\n  Size: {size} bytes\n"
+                return web.Response(text=debug_info)
+            
+            app.router.add_get("/", health_check)
+            app.router.add_get("/health", health_check)
+            app.router.add_get("/debug", debug_files)
+            
+            # Get port from environment (Render sets this)
+            port = int(os.getenv('PORT', 10000))
+            
+            # Start web server
+            runner = web.AppRunner(app)
+            await runner.setup()
+            site = web.TCPSite(runner, '0.0.0.0', port)
+            await site.start()
+            logger.info(f"Health check server started on port {port}")
+            
+            try:
+                # Start polling - this blocks until stopped
+                await dp.start_polling(bot)
+            except (KeyboardInterrupt, SystemExit):
+                logger.info("Bot stopped by signal - exiting restart loop")
+                break  # Don't restart on intentional shutdown
+            except Exception as e:
+                logger.error(f"Unexpected error in polling: {e}", exc_info=True)
+                restart_count += 1
+                logger.warning(f"Will attempt restart {restart_count}/{max_restarts}")
+                await asyncio.sleep(5)  # Wait before restart
+                continue  # Restart the loop
+            finally:
+                logger.info("Cleaning up...")
+                try:
+                    await bot.session.close()
+                    await runner.cleanup()
+                    logger.info("Cleanup completed")
+                except Exception as e:
+                    logger.error(f"Error during cleanup: {e}")
         
-        # Force exit to ensure Render knows we're done
-        logger.info("Exiting process")
+        except Exception as e:
+            logger.error(f"Fatal error during startup: {e}", exc_info=True)
+            restart_count += 1
+            await asyncio.sleep(5)
+    
+    logger.warning(f"Max restarts ({max_restarts}) reached or intentional shutdown")
+    logger.info("Exiting process")
 
 
 if __name__ == '__main__':
@@ -406,6 +422,5 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
     finally:
-        # Ensure process exits
         logger.info("Process terminating")
         exit(0)
