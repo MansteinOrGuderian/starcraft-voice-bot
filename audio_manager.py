@@ -45,7 +45,7 @@ class AudioManager:
                     
                     self.audio_files[relative_path] = display_name
     
-    def search(self, query: str, limit: int = 50) -> List[Tuple[str, str, float]]:
+    def search(self, query: str, limit: int = 20) -> List[Tuple[str, str, float]]:
         """
         Search for audio files matching the query
         Returns list of (relative_path, display_name, score) tuples

@@ -287,7 +287,7 @@ async def inline_query_handler(inline_query: InlineQuery):
     logger.info(f"Inline query received: '{query}' from user {inline_query.from_user.id}")
     
     # Search for matching audio files
-    results = audio_manager.search(query, limit=50)
+    results = audio_manager.search(query, limit=20)
     
     logger.info(f"Found {len(results)} search results")
     
