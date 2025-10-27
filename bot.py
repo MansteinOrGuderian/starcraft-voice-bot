@@ -386,7 +386,9 @@ async def main():
             
             try:
                 # Start polling - this blocks until stopped
-                await dp.start_polling(bot)
+                logger.info("Attempting to connect to Telegram...")
+                await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+                logger.info("Polling started successfully")
             except (KeyboardInterrupt, SystemExit):
                 logger.info("Bot stopped by signal - exiting restart loop")
                 break  # Don't restart on intentional shutdown
