@@ -3,6 +3,7 @@ import logging
 import json
 import os
 import random
+from datetime import datetime, timezone
 from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.types import (
@@ -336,6 +337,19 @@ async def inline_query_handler(inline_query: InlineQuery):
     )
 
 
+async def daily_restart_scheduler(bot_task):
+    """Check every hour if it's time for daily restart (at 00:00 UTC)"""
+    while True:
+        await asyncio.sleep(3600)  # Check every hour
+        
+        now = datetime.now(timezone.utc)
+        # Restart at 00:00 UTC (02:00 Kyiv time)
+        if now.hour == 0 and now.minute < 5:
+            logger.info("Daily restart scheduled (00:00 UTC / 02:00 Kyiv) - triggering restart...")
+            bot_task.cancel()
+            break
+
+
 async def main():
     """Main bot function with auto-restart on failure"""
     max_restarts = 5
@@ -387,11 +401,42 @@ async def main():
             try:
                 # Start polling - this blocks until stopped
                 logger.info("Attempting to connect to Telegram...")
-                await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+                
+                # Create polling task
+                polling_task = asyncio.create_task(
+                    dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+                )
+                
+                # Create daily restart scheduler task
+                scheduler_task = asyncio.create_task(daily_restart_scheduler(polling_task))
+                
                 logger.info("Polling started successfully")
+                
+                # Wait for either task to complete
+                done, pending = await asyncio.wait(
+                    [polling_task, scheduler_task],
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+                
+                # Cancel pending tasks
+                for task in pending:
+                    task.cancel()
+                
+                # Check if it was scheduled restart
+                if scheduler_task in done:
+                    logger.info("Daily restart triggered - restarting bot...")
+                    restart_count = 0  # Reset counter for scheduled restart
+                    await asyncio.sleep(2)
+                    continue
+                
             except (KeyboardInterrupt, SystemExit):
                 logger.info("Bot stopped by signal - exiting restart loop")
                 break  # Don't restart on intentional shutdown
+            except asyncio.CancelledError:
+                logger.info("Polling cancelled - restarting...")
+                restart_count = 0  # Reset counter for scheduled restart
+                await asyncio.sleep(2)
+                continue
             except Exception as e:
                 logger.error(f"Unexpected error in polling: {e}", exc_info=True)
                 restart_count += 1
