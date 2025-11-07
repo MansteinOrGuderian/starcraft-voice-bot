@@ -130,7 +130,7 @@ async def send_category_sounds(message: Message, category: str, title: str):
         response += f"{idx}. {name}\n"
     
     bot_username = (await bot.get_me()).username
-    response += "\n💡 To send any sound, use inline mode:\n"
+    response += f"\n💡 To send any sound, use inline mode:\n"
     response += f"@{bot_username} {category}\n\n"
     response += f"🔄 Send /{category} again for different samples!"
     
@@ -347,6 +347,11 @@ async def daily_restart_scheduler(bot_task):
         if now.hour == 0 and now.minute < 5:
             logger.info("Daily restart scheduled (00:00 UTC / 02:00 Kyiv) - triggering restart...")
             bot_task.cancel()
+            try:
+                await bot_task  # Wait for cancellation to complete
+            except asyncio.CancelledError:
+                pass
+            logger.info("Polling task cancelled successfully")
             break
 
 
@@ -418,15 +423,23 @@ async def main():
                     return_when=asyncio.FIRST_COMPLETED
                 )
                 
-                # Cancel pending tasks
+                # Cancel pending tasks and wait for them to finish
                 for task in pending:
                     task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+                
+                logger.info("All tasks cancelled properly")
+                
+                # Wait a bit for Telegram to release the connection
+                await asyncio.sleep(3)
                 
                 # Check if it was scheduled restart
                 if scheduler_task in done:
                     logger.info("Daily restart triggered - restarting bot...")
                     restart_count = 0  # Reset counter for scheduled restart
-                    await asyncio.sleep(2)
                     continue
                 
             except (KeyboardInterrupt, SystemExit):
