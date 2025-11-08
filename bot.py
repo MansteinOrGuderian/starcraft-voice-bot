@@ -58,14 +58,24 @@ def save_file_id_cache(cache):
 
 file_id_cache = load_file_id_cache()
 
+# Track last activity time for watchdog
+last_activity_time = datetime.now(timezone.utc)
+
 
 def is_admin(user_id: int) -> bool:
     """Check if user is admin"""
     return user_id == ADMIN_USER_ID
 
 
+def update_activity():
+    """Update last activity timestamp"""
+    global last_activity_time
+    last_activity_time = datetime.now(timezone.utc)
+
+
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
+    update_activity()  # Update activity timestamp
     bot_username = (await bot.get_me()).username
     await message.answer(
         "👋 Hello! I'm a voice message bot.\n\n"
@@ -283,6 +293,7 @@ async def cmd_upload(message: Message):
 
 @dp.inline_query()
 async def inline_query_handler(inline_query: InlineQuery):
+    update_activity()  # Update activity timestamp
     query = inline_query.query.strip()
     
     logger.info(f"Inline query received: '{query}' from user {inline_query.from_user.id}")
